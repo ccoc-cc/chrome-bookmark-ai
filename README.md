@@ -2,6 +2,28 @@
 
 面向 Chrome 浏览器的书签整理与重构扩展。支持直接复用已打开的 DeepSeek / ChatGPT 网页会话（免填 API Key、零费用），也支持接入任意 OpenAI 兼容接口；所有整理建议均先进入交互式 Diff 账本与双栏目录树供人工审查和微调，确认后再安全写入 Chrome 书签。
 
+## 界面预览
+
+### 交互式 Diff 变更账本与 Token 成本统计
+
+按改名、目录移动、URL 纠偏、删除分类筛选并逐项勾选，实时统计输入 / 输出 / 缓存命中 Token 与预估费用：
+
+![交互式 Diff 变更账本与 Token 成本统计](docs/images/03-workbench-table.png)
+
+### 左右双栏目录树前后对比（支持内联编辑）
+
+左侧呈现原始杂乱目录，右侧实时预览 AI 重构后的新目录结构与变更标签，支持直接内联微调：
+
+![左右双栏目录树前后对比](docs/images/04-workbench-tree.png)
+
+### 双引擎配置：免 API 网页会话 与 OpenAI 兼容 API 直连
+
+默认采用网页版会话免 API 模式（支持 DeepSeek / ChatGPT），亦可一键切换为官方或本地 API 接口：
+
+![免 API 网页会话模式](docs/images/01-engine-web.png)
+
+![API 接口直连与厂商快捷预设](docs/images/02-engine-api.png)
+
 ## 核心功能
 
 - **双引擎驱动**：默认开启**网页版会话免 API 模式**（支持 `chat.deepseek.com` 与 `chatgpt.com`），亦可一键切换为**官方/自建 API 接口直连模式**，内置小米 MiMo、DeepSeek、阿里百炼、智谱 GLM、Kimi、豆包、OpenAI、OpenRouter、Ollama 与 LM Studio 快捷预设。
