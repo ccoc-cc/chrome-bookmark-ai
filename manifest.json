@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome 书签 AI 智能重构工作台",
+  "version": "1.0.0",
+  "description": "通用 Chrome 书签智能归类、标题去噪与结构化重构助手。支持各家官方 API 直连与网页版会话免 API 双模式。",
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://chat.deepseek.com/*",
+        "*://chatgpt.com/*",
+        "*://*.openai.com/*"
+      ],
+      "js": ["src/content/web_bridge.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "打开 AI 书签工作台"
+  }
+}

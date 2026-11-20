@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Chrome 书签 AI 智能重构工作台</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-border-hl: rgba(96, 165, 250, 0.3);
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --accent-glow: rgba(59, 130, 246, 0.25);
+      --green: #10b981;
+      --green-glow: rgba(16, 185, 129, 0.25);
+      --red: #ef4444;
+      --amber: #f59e0b;
+      --purple: #a855f7;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at top right, #1e1b4b 0%, #0f172a 40%, #020617 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container { max-width: 1380px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+    /* Header */
+    .header-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    .header-title { display: flex; align-items: center; gap: 12px; }
+    .header-title h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 9999px;
+      font-size: 11px; font-weight: 600; background: var(--accent-glow);
+      color: #93c5fd; border: 1px solid rgba(147, 197, 253, 0.3);
+    }
+    .badge.free { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3); }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(0, 0, 0, 0.25); border: 1px solid var(--card-border);
+      border-radius: 9999px; padding: 6px 14px; font-size: 12px;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
+    .status-dot.active { background: var(--green); box-shadow: 0 0 10px var(--green); }
+    .status-dot.warn { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+
+    /* Nav Tabs */
+    .nav-tabs { display: flex; gap: 6px; }
+    .nav-tab {
+      background: transparent; border: 1px solid transparent; color: var(--text-muted);
+      padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .nav-tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+    .nav-tab.active {
+      color: #fff; background: rgba(255, 255, 255, 0.1);
+      border-color: var(--card-border-hl); font-weight: 600;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg); backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border); border-radius: 14px;
+      padding: 20px 24px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+    .card-title {
+      font-size: 16px; font-weight: 600; margin-bottom: 6px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .card-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+
+    /* Segmented Mode Switch Bar */
+    .mode-switch-bar {
+      display: flex; gap: 8px; background: rgba(0, 0, 0, 0.4);
+      padding: 5px; border-radius: 10px; border: 1px solid var(--card-border);
+      margin-bottom: 18px;
+    }
+    .mode-btn {
+      flex: 1; padding: 10px 16px; font-size: 13px; font-weight: 600;
+      border: 1px solid transparent; border-radius: 8px; background: transparent;
+      color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .mode-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
+    .mode-btn.active {
+      color: #fff; background: rgba(59, 130, 246, 0.2);
+      border-color: var(--accent); box-shadow: 0 2px 10px rgba(59, 130, 246, 0.3);
+    }
+    .mode-btn.active.free-mode {
+      background: rgba(16, 185, 129, 0.2); border-color: var(--green);
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+    }
+
+    /* Form controls */
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    input[type="text"], input[type="password"], input[type="number"], select, textarea {
+      background: rgba(15, 23, 42, 0.8); border: 1px solid var(--card-border);
+      border-radius: 8px; color: var(--text); padding: 10px 14px; font-size: 13px;
+      font-family: inherit; transition: border-color 0.2s; outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    textarea { font-family: var(--font-mono); font-size: 12px; line-height: 1.5; resize: vertical; }
+
+    /* Tag buttons with official SVGs */
+    .provider-group { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .provider-group-label { font-size: 11px; color: var(--text-dim); font-weight: 600; min-width: 70px; }
+    .quick-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag-btn {
+      font-size: 11px; padding: 4px 10px; border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border);
+      color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+      display: inline-flex; align-items: center; gap: 5px; user-select: none;
+    }
+    .tag-btn:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); border-color: var(--accent); }
+    .tag-btn.active {
+      background: rgba(59, 130, 246, 0.2); border-color: var(--accent);
+      color: #93c5fd; font-weight: 600;
+    }
+    .tag-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+    button {
+      padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; border: none; display: inline-flex;
+      align-items: center; justify-content: center; gap: 6px;
+    }
+    button.primary { background: var(--accent); color: #fff; }
+    button.primary:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 0 16px var(--accent-glow); }
+    button.secondary { background: rgba(255, 255, 255, 0.08); color: var(--text); border: 1px solid var(--card-border); }
+    button.secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+    button.success { background: var(--green); color: #fff; }
+    button.success:hover:not(:disabled) { background: #059669; box-shadow: 0 0 16px var(--green-glow); }
+    button.danger { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+    button.danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.3); }
+    button.sm { padding: 6px 12px; font-size: 12px; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Progress & Stats */
+    .progress-bar {
+      height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 9999px;
+      overflow: hidden; margin-top: 14px;
+    }
+    .progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.3s; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 14px; }
+    .stat-card {
+      background: rgba(0, 0, 0, 0.25); border: 1px solid var(--card-border);
+      border-radius: 8px; padding: 10px 14px; text-align: center;
+    }
+    .stat-card .k { font-size: 11px; color: var(--text-dim); text-transform: uppercase; font-weight: 600; margin-bottom: 2px; }
+    .stat-card .v { font-size: 18px; font-weight: 700; font-family: var(--font-mono); }
+    .stat-card.hl .v { color: var(--accent); }
+    .stat-card.ok .v { color: var(--green); }
+    .stat-card.warn .v { color: var(--amber); }
+
+    /* View Switcher */
+    .view-switch-btns {
+      display: inline-flex; background: rgba(0, 0, 0, 0.3);
+      padding: 3px; border-radius: 8px; border: 1px solid var(--card-border);
+    }
+    .view-switch-btns button {
+      padding: 6px 14px; font-size: 12px; font-weight: 600;
+      border: none; border-radius: 6px; background: transparent;
+      color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+    }
+    .view-switch-btns button.active {
+      background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-glow);
+    }
+
+    /* Filters & Tables */
+    .filter-toolbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap; gap: 10px;
+    }
+    .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .filter-chip {
+      font-size: 11px; padding: 4px 10px; border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border);
+      color: var(--text-muted); cursor: pointer; user-select: none;
+    }
+    .filter-chip.active {
+      background: rgba(59, 130, 246, 0.2); border-color: var(--accent);
+      color: #93c5fd; font-weight: 600;
+    }
+
+    .diff-table-container { margin-top: 12px; max-height: 600px; overflow-y: auto; border: 1px solid var(--card-border); border-radius: 10px; }
+    table.diff-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+    table.diff-table th {
+      background: rgba(15, 23, 42, 0.95); position: sticky; top: 0; z-index: 10;
+      padding: 10px 12px; font-weight: 600; color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+    }
+    table.diff-table td { padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); vertical-align: top; }
+    table.diff-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    .badge-op { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+    .badge-op.move { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-op.rename { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge-op.both { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-op.url_fix { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .badge-op.delete { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-op.keep { background: rgba(255, 255, 255, 0.05); color: var(--text-dim); }
+
+    /* Dual-Column Tree */
+    .tree-diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+    @media (max-width: 860px) { .tree-diff-grid { grid-template-columns: 1fr; } }
+    .tree-col { background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+    .tree-col-header { background: rgba(255, 255, 255, 0.03); padding: 10px 14px; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; }
+    .tree-col-title { font-size: 13px; font-weight: 600; color: #fff; }
+    .tree-scroll-pane { padding: 12px; max-height: 600px; overflow-y: auto; font-size: 12px; line-height: 1.6; }
+
+    .tree-node-folder { margin-bottom: 3px; }
+    .tree-folder-head { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 3px 6px; border-radius: 6px; user-select: none; transition: background 0.15s; }
+    .tree-folder-head:hover { background: rgba(255, 255, 255, 0.04); }
+    .tree-arrow { font-size: 9px; color: var(--text-dim); transition: transform 0.15s; display: inline-block; width: 12px; text-align: center; }
+    .tree-arrow.open { transform: rotate(90deg); }
+    .tree-folder-icon { font-size: 13px; }
+    .tree-folder-name { font-weight: 600; color: #e5e7eb; font-size: 12px; }
+    .tree-folder-badge { font-size: 10px; color: var(--text-dim); background: rgba(255, 255, 255, 0.05); padding: 1px 6px; border-radius: 999px; margin-left: 4px; }
+    .tree-folder-badge.new-dir { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .tree-node-children { padding-left: 16px; border-left: 1px dashed rgba(255, 255, 255, 0.1); margin-left: 8px; margin-top: 2px; }
+    .tree-node-children.collapsed { display: none; }
+
+    .tree-leaf-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 6px; margin: 2px 0; transition: background 0.15s; border-left: 2px solid transparent; }
+    .tree-leaf-item:hover { background: rgba(255, 255, 255, 0.03); }
+    .tree-leaf-item.has-change { background: rgba(59, 130, 246, 0.08); border-left-color: var(--accent); }
+    .tree-leaf-item.is-delete { background: rgba(239, 68, 68, 0.08); border-left-color: var(--red); opacity: 0.7; }
+    .tree-leaf-item.is-url-fix { background: rgba(192, 132, 252, 0.08); border-left-color: var(--purple); }
+    .tree-leaf-item.is-move { background: rgba(245, 158, 11, 0.08); border-left-color: var(--amber); }
+
+    .tree-leaf-main { display: flex; align-items: flex-start; gap: 6px; flex: 1; min-width: 0; }
+    .tree-leaf-text { flex: 1; min-width: 0; }
+    .tree-leaf-title { word-break: break-all; color: #d1d5db; font-size: 12px; }
+    .tree-leaf-title.diff-new { color: #6ee7b7; font-weight: 500; }
+    .tree-leaf-sub { font-size: 10px; color: var(--text-dim); word-break: break-all; margin-top: 1px; }
+    .tree-leaf-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+    .tree-inline-editor {
+      background: rgba(15, 23, 42, 0.98); border: 1px solid var(--accent); border-radius: 8px;
+      padding: 10px 12px; margin: 6px 0; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    .tree-inline-editor label { font-size: 11px; color: #9ca3af; }
+    .tree-inline-editor input { font-size: 12px; padding: 6px 8px; background: rgba(0,0,0,0.5); }
+    .editor-btn-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
+
+    /* Web Session Panel */
+    .web-session-box {
+      background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 12px; padding: 18px 20px; margin-bottom: 16px;
+    }
+    .web-provider-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+    .web-provider-card {
+      background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border);
+      border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .web-provider-card:hover { border-color: var(--green); background: rgba(16, 185, 129, 0.08); }
+    .web-provider-card.active { border-color: var(--green); background: rgba(16, 185, 129, 0.15); box-shadow: 0 0 16px rgba(16, 185, 129, 0.2); }
+    .web-provider-logo { width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header-card">
+      <div class="header-title">
+        <h1>Chrome 书签 AI 智能重构工作台</h1>
+        <span id="versionBadge" class="badge free">v1.0.0</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div id="connPill" class="status-pill">
+          <span id="connDot" class="status-dot active"></span>
+          <span id="connLabel">⚡ 网页会话免API模式 (DeepSeek)</span>
+        </div>
+        <div class="nav-tabs">
+          <button class="nav-tab active" data-tab="tab-settings">⚙️ 引擎配置</button>
+          <button class="nav-tab" data-tab="tab-prompts">📝 提示词与预设</button>
+          <button class="nav-tab" data-tab="tab-workbench">🚀 书签整理与审查</button>
+          <button class="nav-tab" data-tab="tab-logs">📜 运行日志</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 1: Settings -->
+    <div id="tab-settings" class="tab-content active">
+      <div class="card">
+        <div class="card-title">
+          <span>AI 驱动引擎与执行模式</span>
+          <span class="badge free">默认免 API 运行</span>
+        </div>
+        <div class="card-desc">支持零门槛直接利用浏览器现有的 DeepSeek / ChatGPT 网页版会话（免填 Key、零 API 成本），亦可切换为 OpenAI 兼容的官方/自建 API 接口。</div>
+
+        <!-- Mode Segmented Switch -->
+        <div class="mode-switch-bar">
+          <button type="button" id="btnModeWeb" class="mode-btn free-mode active">
+            <span>⚡ 网页版会话免 API 模式 (默认推荐 · 零成本)</span>
+          </button>
+          <button type="button" id="btnModeApi" class="mode-btn">
+            <span>🌐 官方/自建 API 接口直连模式 (自定义 Key / URL / 模型)</span>
+          </button>
+        </div>
+
+        <!-- Subpanel A: 免 API 网页会话配置 (默认展示) -->
+        <div id="panelWebConfig" class="web-session-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <div style="font-size: 14px; font-weight: 700; color: #fff;">⚡ 浏览器网页版会话自动化桥接 (Web Session Bridge)</div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                利用扩展 Content Script 直接向你已登录的网页版注入批次提示词并抓取结构化结果。无需申请 API Key、无网络代理风控、零费用。
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button id="btnOpenWebTab" class="success sm" type="button">🔗 检测并打开网页会话</button>
+              <button id="btnPingBridge" class="secondary sm" type="button">🔄 探测连接状态</button>
+            </div>
+          </div>
+
+          <div class="web-provider-cards">
+            <!-- DeepSeek Web Card -->
+            <div id="cardWebDeepSeek" class="web-provider-card active" data-provider="deepseek">
+              <div class="web-provider-logo">
+                <svg viewBox="0 0 24 24" width="28" height="28" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z" fill="#4D6BFE"/></svg>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 600; color: #fff; font-size: 13px;">DeepSeek 网页版 (推荐)</div>
+                <div style="font-size: 11px; color: var(--text-muted);">chat.deepseek.com</div>
+                <div id="statusWebDeepSeek" style="font-size: 11px; color: #6ee7b7; margin-top: 2px;">🟢 探测就绪</div>
+              </div>
+            </div>
+
+            <!-- ChatGPT Web Card -->
+            <div id="cardWebChatGPT" class="web-provider-card" data-provider="chatgpt">
+              <div class="web-provider-logo">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="#10A37F"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 600; color: #fff; font-size: 13px;">ChatGPT 网页版</div>
+                <div style="font-size: 11px; color: var(--text-muted);">chatgpt.com</div>
+                <div id="statusWebChatGPT" style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">⚪ 未连接</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 14px; margin-top: 14px; align-items: center; flex-wrap: wrap;">
+            <div class="form-group" style="width: 140px;">
+              <label for="webBatchSize">单批书签数</label>
+              <input type="number" id="webBatchSize" value="20" min="5" max="100" step="5">
+            </div>
+            <div class="form-group" style="width: 160px;">
+              <label for="webWaitTimeout">单批最长等待(秒)</label>
+              <input type="number" id="webWaitTimeout" value="120" min="30" max="300" step="10">
+            </div>
+            <div style="flex: 1; font-size: 11px; color: var(--text-muted); padding-top: 16px;">
+              💡 提示：使用免 API 模式时，保持该网页会话标签页打开即可。工作台会自动将任务切片注入并实时回填。
+            </div>
+          </div>
+        </div>
+
+        <!-- Subpanel B: API 接口直连配置 -->
+        <div id="panelApiConfig" style="display: none;">
+          <div class="form-grid">
+            <div class="form-group full">
+              <label for="cfgBaseUrl">API Base URL（服务基址）与厂商快捷选择（官方矢量图标）</label>
+              <input type="text" id="cfgBaseUrl" placeholder="https://api.xiaomimimo.com/v1">
+              <div id="providerTagsContainer" style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;"></div>
+            </div>
+
+            <div class="form-group full">
+              <label for="cfgApiKey">API Key（密钥，本地沙箱存储）</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="password" id="cfgApiKey" placeholder="sk-..." style="flex: 1;">
+                <button id="toggleKeyBtn" class="secondary sm" type="button">显示/隐藏</button>
+              </div>
+            </div>
+
+            <div class="form-group full">
+              <label for="cfgModel">Model Name（模型标识，点击下方标签可快速填入）</label>
+              <input type="text" id="cfgModel" placeholder="mimo-v2.6-flash">
+              <div id="modelTagsContainer" class="quick-tags" style="margin-top: 6px;"></div>
+            </div>
+
+            <div class="form-group">
+              <label for="cfgBatchSize">单批分析书签数 (Batch Size)</label>
+              <input type="number" id="cfgBatchSize" value="20" min="5" max="80" step="5">
+            </div>
+
+            <div class="form-group">
+              <label for="cfgTemperature">采样温度 (Temperature)</label>
+              <input type="number" id="cfgTemperature" value="0.2" min="0" max="1.0" step="0.05">
+            </div>
+
+            <div class="form-group" style="justify-content: center;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 18px;">
+                <input type="checkbox" id="cfgJsonMode" checked>
+                <span>强制 JSON 结构化输出模式 (response_format)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button id="testConnBtn" class="secondary">🔌 测试接口连通性</button>
+            <button id="saveSettingsBtn" class="primary">💾 保存 API 配置</button>
+            <button id="resetSettingsBtn" class="danger sm">恢复默认</button>
+            <span id="testResultMsg" style="font-size: 12px; margin-left: 8px;"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Prompts -->
+    <div id="tab-prompts" class="tab-content">
+      <div class="card">
+        <div class="card-title">任务提示词与预设策略</div>
+        <div class="card-desc">选择开箱即用的经典书签重构策略，或自由定制专属 System Prompt 与插值指令模板。</div>
+
+        <div class="form-group full">
+          <label for="presetSelect">策略预设库</label>
+          <select id="presetSelect">
+            <option value="deep_refactor" selected>🚀 深度规范重构（标题净化 + 智能归类 + 路由纠偏）</option>
+            <option value="categorize">📁 自适应目录归纳（保持标题与链接不变）</option>
+            <option value="title_clean">✨ 标题极简去噪（保持目录与链接不变）</option>
+            <option value="audit_rot">🧹 失效迁移与冗余审查（专项健康体检）</option>
+            <option value="custom">🛠️ 自由专家模式 (Custom)</option>
+          </select>
+        </div>
+
+        <div class="form-group full" style="margin-top: 12px;">
+          <label for="promptSystem">System Prompt (系统角色提示词)</label>
+          <textarea id="promptSystem" rows="8"></textarea>
+        </div>
+
+        <div class="form-group full" style="margin-top: 12px;">
+          <label for="promptUser">User Prompt Template (单批书签模板，支持 {{FOLDER_TREE}} 与 {{BOOKMARK_LIST}} 变量替换)</label>
+          <textarea id="promptUser" rows="8"></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button id="savePromptBtn" class="primary">💾 保存当前提示词配置</button>
+          <button id="resetPresetBtn" class="secondary">🔄 重置为该预设官方默认值</button>
+          <span id="promptStatusMsg" style="font-size: 12px; color: var(--green);"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Workbench -->
+    <div id="tab-workbench" class="tab-content">
+      <div class="card">
+        <div class="card-title">
+          <span>书签作用域与分析总控</span>
+          <span id="workbenchEngineBadge" class="badge free">⚡ 网页免API模式运行中</span>
+        </div>
+        
+        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+          <div class="form-group" style="min-width: 320px; flex: 1;">
+            <label for="scopeFolderSelect">分析作用域（选择要重构的书签层级）</label>
+            <select id="scopeFolderSelect">
+              <option value="ROOT_ALL">书签栏 (全量扫描)</option>
+            </select>
+          </div>
+          <button id="scanBtn" class="secondary">🔄 重新扫描书签</button>
+          <button id="startAiBtn" class="primary">⚡ 开始网页会话自动化分析</button>
+          <button id="stopAiBtn" class="danger" disabled>⏹️ 停止</button>
+          <button id="backupBtn" class="secondary">💾 导出当前书签快照 (JSON)</button>
+          <button id="applyChangesBtn" class="success" disabled>⚡ 执行选中的变更</button>
+        </div>
+
+        <!-- 极简免 API 人工回贴保底工具条（双保险） -->
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-radius: 8px; border: 1px dashed var(--card-border);">
+          <span style="font-size: 12px; color: var(--text-muted);">
+            🛡️ <b>免 API 辅助总控</b>：遇到卡顿可随时一键提取网页结果，或手动中转：
+          </span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button id="btnGrabWebReply" class="primary sm" type="button" style="background: linear-gradient(135deg, #10b981, #059669); font-weight: 600; box-shadow: 0 2px 8px rgba(16,185,129,0.3);">⚡ 立即读取网页当前结果并解析</button>
+            <button id="btnCopyCurrentPrompt" class="secondary sm" type="button">📋 复制当前批次提示词</button>
+            <button id="btnPasteWebReply" class="secondary sm" type="button">📥 粘贴并解析网页回复</button>
+          </div>
+        </div>
+
+        <div class="progress-bar"><div class="progress-fill" id="workbenchProgress"></div></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+          <span id="workbenchStatusText" style="font-size: 12px; color: var(--text-muted);">就绪</span>
+          <span id="batchProgressText" style="font-size: 12px; color: #60a5fa; font-weight: 600;"></span>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card hl"><div class="k">扫描书签</div><div class="v" id="stTotalScanned">0</div></div>
+          <div class="stat-card ok"><div class="k">建议变更</div><div class="v" id="stProposed">0</div></div>
+          <div class="stat-card warn"><div class="k">目录移动</div><div class="v" id="stMoves">0</div></div>
+          <div class="stat-card hl"><div class="k">标题改写</div><div class="v" id="stRenames">0</div></div>
+          <div class="stat-card" style="color: var(--purple);"><div class="k">URL纠偏</div><div class="v" id="stUrlFixes">0</div></div>
+          <div class="stat-card ok"><div class="k">已勾选待执行</div><div class="v" id="stSelected">0</div></div>
+        </div>
+
+        <!-- Token 消耗与成本预估面板 -->
+        <div class="token-cost-panel" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--card-border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 13px; font-weight: 600; color: #fff;">📊 Token 消耗量与成本预估</span>
+              <span id="tokTotalBadge" class="badge free" style="font-size: 11px;">免API模式: 免费运行</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; flex-wrap: wrap;">
+              <span style="color: var(--text-muted);">单价设置（每百万 Token / 1M）：</span>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <label style="color: var(--text-dim); font-size: 11px;">输入</label>
+                <input type="number" id="priceInputRate" value="0.5" step="0.05" min="0" style="width: 55px; padding: 3px 5px; font-size: 11px;" title="输入单价（每百万 token）">
+              </div>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <label style="color: var(--text-dim); font-size: 11px;">输出</label>
+                <input type="number" id="priceOutputRate" value="1.5" step="0.05" min="0" style="width: 55px; padding: 3px 5px; font-size: 11px;" title="输出单价（每百万 token）">
+              </div>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <label style="color: var(--text-dim); font-size: 11px;">缓存</label>
+                <input type="number" id="priceCacheRate" value="0.1" step="0.05" min="0" style="width: 55px; padding: 3px 5px; font-size: 11px;" title="缓存输入单价（每百万 token）">
+              </div>
+              <select id="priceCurrency" style="padding: 3px 6px; font-size: 11px;">
+                <option value="¥">CNY (¥)</option>
+                <option value="$">USD ($)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin-top: 10px;">
+            <div class="stat-card">
+              <div class="k">📥 输入 Token</div>
+              <div class="v" id="tokPrompt">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="k">📤 输出 Token</div>
+              <div class="v" id="tokCompletion">0</div>
+            </div>
+            <div class="stat-card" style="color: #60a5fa;">
+              <div class="k">⚡ 缓存命中 Token</div>
+              <div class="v" id="tokCached">0</div>
+            </div>
+            <div class="stat-card ok">
+              <div class="k">💰 预估总花费</div>
+              <div class="v" id="tokCost">¥ 0.0000</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diff Ledger Card -->
+      <div class="card">
+        <div class="card-title" style="flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <span>交互式 Diff 变更账本（人类审查确认）</span>
+            <div class="view-switch-btns">
+              <button id="btnViewTable" class="active" type="button">📋 表格勾选确认</button>
+              <button id="btnViewTree" type="button">🌲 左右双栏目录树对比（可编辑）</button>
+            </div>
+          </div>
+          <span style="font-size: 12px; font-weight: 400; color: var(--text-muted);">仅勾选/保留的项目会在点击【执行选中的变更】后真正写入 Chrome 书签</span>
+        </div>
+
+        <!-- 视图 1: 表格勾选确认 -->
+        <div id="diffTableViewContainer">
+          <div class="filter-toolbar">
+            <div class="filter-chips">
+              <span class="filter-chip active" data-filter="all">全部 (<span id="cntAll">0</span>)</span>
+              <span class="filter-chip" data-filter="changed">仅看有变更 (<span id="cntChanged">0</span>)</span>
+              <span class="filter-chip" data-filter="url_fix">仅 URL 纠偏 (<span id="cntUrlFix">0</span>)</span>
+              <span class="filter-chip" data-filter="move">仅移动 (<span id="cntMove">0</span>)</span>
+              <span class="filter-chip" data-filter="rename">仅改名 (<span id="cntRename">0</span>)</span>
+              <span class="filter-chip" data-filter="delete">仅删除 (<span id="cntDelete">0</span>)</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button id="btnSelectAll" class="secondary sm">全选</button>
+              <button id="btnDeselectAll" class="secondary sm">全不选</button>
+              <button id="btnSelectChangedOnly" class="secondary sm">仅选有变更项</button>
+            </div>
+          </div>
+
+          <div class="diff-table-container">
+            <table class="diff-table">
+              <thead>
+                <tr>
+                  <th style="width: 38px; text-align: center;"><input type="checkbox" id="masterCheckbox"></th>
+                  <th style="width: 70px;">操作</th>
+                  <th style="width: 32%;">原标题 / 新建议标题</th>
+                  <th style="width: 30%;">原路径 / 新目标目录</th>
+                  <th>决策理由</th>
+                  <th style="width: 55px; text-align: center;">操作</th>
+                </tr>
+              </thead>
+              <tbody id="diffTableBody">
+                <tr>
+                  <td colspan="6" style="text-align: center; padding: 36px; color: var(--text-dim);">
+                    暂无待审查计划。请点击上方【⚡ 开始网页会话自动化分析】或【重新扫描】。
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 视图 2: 左右双栏目录树对比（支持即时编辑） -->
+        <div id="diffTreeViewContainer" style="display: none;">
+          <div class="filter-toolbar">
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1; max-width: 480px;">
+              <input type="text" id="treeSearchInput" placeholder="🔍 快速过滤目录或书签关键词..." style="padding: 6px 12px; font-size: 12px; width: 100%;">
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button id="btnExpandAllTrees" class="secondary sm" type="button">全部展开</button>
+              <button id="btnCollapseAllTrees" class="secondary sm" type="button">全部折叠</button>
+            </div>
+          </div>
+
+          <div class="tree-diff-grid">
+            <!-- 左栏: 现状目录树 -->
+            <div class="tree-col">
+              <div class="tree-col-header">
+                <span class="tree-col-title">📁 现状目录树（原始状态）</span>
+                <span id="origTreeCount" class="badge">0 项</span>
+              </div>
+              <div id="origTreeContent" class="tree-scroll-pane">
+                <div style="color: var(--text-dim); text-align: center; padding: 20px;">未加载数据</div>
+              </div>
+            </div>
+
+            <!-- 右栏: 治理后拟定目录树 (可编辑) -->
+            <div class="tree-col" style="border-color: var(--card-border-hl);">
+              <div class="tree-col-header" style="background: rgba(59, 130, 246, 0.08);">
+                <span class="tree-col-title" style="color: #93c5fd;">🚀 治理后拟定目录树（实时预览与修改）</span>
+                <span id="propTreeCount" class="badge" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);">0 项</span>
+              </div>
+              <div id="propTreeContent" class="tree-scroll-pane">
+                <div style="color: var(--text-dim); text-align: center; padding: 20px;">暂无治理计划</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Logs -->
+    <div id="tab-logs" class="tab-content">
+      <div class="card">
+        <div class="card-title">
+          <span>详细执行与排障日志</span>
+          <div style="display: flex; gap: 8px;">
+            <button id="copyLogBtn" class="secondary sm">📋 复制全部日志</button>
+            <button id="clearLogBtn" class="danger sm">清空</button>
+          </div>
+        </div>
+        <textarea id="logBox" rows="18" readonly style="width: 100%; margin-top: 8px; font-size: 11px;"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Datalist for folder auto-complete in inline editor -->
+  <datalist id="folderPathDatalist"></datalist>
+
+  <script src="../services/ai_client.js"></script>
+  <script src="migrator.js"></script>
+</body>
+</html>
